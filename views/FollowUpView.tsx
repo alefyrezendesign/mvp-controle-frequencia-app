@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { MessageCircle, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { MessageCircle, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock, X, Copy, Check } from 'lucide-react';
 import { AttendanceStatus, CabinetStatus, Unit, Member, FrequencyCategory } from '../types';
 import { calculateAttendance, getValidServiceDates, getNucleoColor, getAbsenceCategory } from '../utils';
 import { format, subMonths, addMonths } from 'date-fns';
@@ -13,6 +13,12 @@ interface FollowUpViewProps {
 
 const FollowUpView: React.FC<FollowUpViewProps> = ({ store, selectedUnit }) => {
   const [selectedMonthDate, setSelectedMonthDate] = useState(new Date());
+  const [copyModalData, setCopyModalData] = useState<{ isOpen: boolean; text: string; copied: boolean }>({
+    isOpen: false,
+    text: '',
+    copied: false
+  });
+  
   const currentMonthStr = format(selectedMonthDate, 'yyyy-MM');
 
   const allFollowUps = useMemo(() => {
@@ -51,10 +57,44 @@ const FollowUpView: React.FC<FollowUpViewProps> = ({ store, selectedUnit }) => {
   [allFollowUps]);
 
   const handleInformPastor = (member: any) => {
-    const mesFormatado = format(selectedMonthDate, 'MMMM/yyyy', { locale: ptBR });
-    const text = `Olá, pastor. Frequência do(a) ${member.name} (Unidade: ${selectedUnit.name}) em ${mesFormatado}: Presenças ${member.presences}, Faltas ${member.absences}, Justificadas ${member.justifications}, Frequência ${member.percent.toFixed(0)}%. Categoria: ${member.category.label.toUpperCase()}. Status: ${member.cabinetStatus}. Sugiro agendar um gabinete para acompanhamento.`;
-    const url = `https://wa.me/${selectedUnit.pastorPhone}?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    const mesFormatado = format(selectedMonthDate, 'MM', { locale: ptBR });
+    const anoFormatado = format(selectedMonthDate, 'yyyy', { locale: ptBR });
+    
+    const text = `Olá, pastor. Graça e paz.
+Venho informar sobre a frequência do(a) ${member.name} (Unidade: ${selectedUnit.name}) em ${mesFormatado}/${anoFormatado}.
+
+Frequência no mês:
+
+Presenças: ${member.presences}
+
+Faltas: ${member.absences}
+
+Justificadas: ${member.justifications}
+
+Percentual de frequência: ${member.percent.toFixed(0)}%
+
+Categoria: ${member.category.label.toUpperCase()}
+Status: ${member.cabinetStatus}
+
+Sugiro agendar um gabinete para acompanhamento.`;
+    
+    setCopyModalData({
+      isOpen: true,
+      text: text,
+      copied: false
+    });
+  };
+
+  const handleCopyText = async () => {
+    try {
+      await navigator.clipboard.writeText(copyModalData.text);
+      setCopyModalData(prev => ({ ...prev, copied: true }));
+      setTimeout(() => {
+        setCopyModalData(prev => ({ ...prev, copied: false }));
+      }, 2000);
+    } catch (err) {
+      console.error('Falha ao copiar texto: ', err);
+    }
   };
 
   return (
@@ -113,6 +153,61 @@ const FollowUpView: React.FC<FollowUpViewProps> = ({ store, selectedUnit }) => {
               resolved
             />
           ))}
+        </div>
+      )}
+
+      {/* Modal de Cópia de Mensagem */}
+      {copyModalData.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-black text-white tracking-tight">Mensagem para o Pastor</h3>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Copie e cole no WhatsApp</p>
+              </div>
+              <button 
+                onClick={() => setCopyModalData(prev => ({ ...prev, isOpen: false }))}
+                className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-zinc-500" />
+              </button>
+            </div>
+
+            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 mb-8">
+              <textarea
+                readOnly
+                value={copyModalData.text}
+                className="w-full bg-transparent text-xs sm:text-sm text-zinc-300 font-medium leading-relaxed resize-none outline-none min-h-[220px] custom-scrollbar"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setCopyModalData(prev => ({ ...prev, isOpen: false }))}
+                className="flex-1 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest"
+              >
+                Fechar
+              </button>
+              <button 
+                onClick={handleCopyText}
+                className={`flex-[2] py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                  copyModalData.copied 
+                    ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
+                    : 'bg-purple-600 text-white shadow-purple-600/20 hover:bg-purple-500'
+                }`}
+              >
+                {copyModalData.copied ? (
+                  <>
+                    <Check className="w-4 h-4" /> Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" /> Copiar Mensagem
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

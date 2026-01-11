@@ -14,8 +14,8 @@ const SettingsView: React.FC<{ store: any }> = ({ store }) => {
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
   const [adminError, setAdminError] = useState(false);
 
-  // Estados para nova senha
-  const [newPassword, setNewPassword] = useState(settings.accessPassword || '123456');
+  // Estados para nova senha - Fallback para 'mvp20152026#'
+  const [newPassword, setNewPassword] = useState(settings.accessPassword || 'mvp20152026#');
   const [showPass, setShowPass] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 

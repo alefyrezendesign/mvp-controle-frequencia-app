@@ -1,15 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { format, parseISO, isValid } from 'date-fns';
-import { 
-  ClipboardList, 
-  LayoutDashboard, 
-  Users, 
-  Settings 
-} from 'lucide-react';
-
+import { format, parseISO } from 'date-fns';
 import { useDataStore } from './store';
-import { AppTab, Unit } from './types';
+import { AppTab } from './types';
 import { UNITS } from './constants';
 import { getValidServiceDates } from './utils';
 
@@ -26,24 +19,20 @@ import SettingsView from './views/SettingsView';
 
 const App: React.FC = () => {
   const store = useDataStore();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('church_auth') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => sessionStorage.getItem('church_auth') === 'true');
   const [activeTab, setActiveTab] = useState<AppTab>('register');
   const [selectedUnitId, setSelectedUnitId] = useState<string>(localStorage.getItem('church_last_unit') || UNITS[0].id);
   
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const initialDate = localStorage.getItem('church_last_date') || todayStr;
-  const [selectedDate, setSelectedDate] = useState<string>(initialDate);
+  const [selectedDate, setSelectedDate] = useState<string>(localStorage.getItem('church_last_date') || todayStr);
 
   const selectedUnit = useMemo(() => 
     store.units.find(u => u.id === selectedUnitId) || store.units[0], 
   [selectedUnitId, store.units]);
 
-  // Auth Logic usando a senha das configurações ou o padrão 123456
   const handleLogin = (password: string) => {
-    const masterPassword = store.settings.accessPassword || '123456';
-    if (password === masterPassword) {
+    // Fallback para 'mvp20152026#' se a configuração ainda não existir
+    if (password === (store.settings.accessPassword || 'mvp20152026#')) {
       setIsAuthenticated(true);
       sessionStorage.setItem('church_auth', 'true');
       return true;
@@ -66,31 +55,24 @@ const App: React.FC = () => {
     }
   }, [selectedUnitId, selectedUnit.serviceDays, store.loading, isAuthenticated]);
 
-  useEffect(() => {
-    if (isAuthenticated) localStorage.setItem('church_last_unit', selectedUnitId);
-  }, [selectedUnitId, isAuthenticated]);
-
-  useEffect(() => {
-    if (isAuthenticated) localStorage.setItem('church_last_date', selectedDate);
-  }, [selectedDate, isAuthenticated]);
+  useEffect(() => { if (isAuthenticated) localStorage.setItem('church_last_unit', selectedUnitId); }, [selectedUnitId, isAuthenticated]);
+  useEffect(() => { if (isAuthenticated) localStorage.setItem('church_last_date', selectedDate); }, [selectedDate, isAuthenticated]);
 
   if (store.loading) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-black">
+      <div className="min-h-screen w-screen flex flex-col items-center justify-center bg-black">
         <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-zinc-500 font-medium animate-pulse">Iniciando sistema...</p>
+        <p className="text-zinc-500 font-medium animate-pulse">Sincronizando dados...</p>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <LoginView onLogin={handleLogin} />;
-  }
+  if (!isAuthenticated) return <LoginView onLogin={handleLogin} />;
 
   const renderView = () => {
     switch (activeTab) {
       case 'register':
-        return <RegisterView store={store} selectedUnit={selectedUnit} selectedDate={selectedDate} />;
+        return <RegisterView store={store} selectedUnit={selectedUnit} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />;
       case 'dashboard':
         return <DashboardView store={store} selectedUnit={selectedUnit} />;
       case 'members':
@@ -101,28 +83,26 @@ const App: React.FC = () => {
         return <TipsView store={store} />;
       case 'settings':
         return <SettingsView store={store} />;
-      default:
-        return null;
+      default: return null;
     }
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden text-gray-100 selection:bg-purple-600/30">
+    <div className="flex flex-col h-screen bg-black text-gray-100 overflow-hidden">
+      {/* HEADER FIXO NO TOPO */}
       <TopBar 
         selectedUnitId={selectedUnitId}
         setSelectedUnitId={setSelectedUnitId}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
         store={store}
-        selectedUnit={selectedUnit}
-        activeTab={activeTab}
         onLogout={handleLogout}
       />
       
-      <main className="flex-1 overflow-y-auto pb-24 pt-4 px-4 md:px-8 max-w-5xl mx-auto w-full">
+      {/* ÁREA DE CONTEÚDO COM ROLAGEM PRÓPRIA */}
+      <main className="flex-1 overflow-y-auto pt-4 px-4 pb-32 md:px-8 max-w-5xl mx-auto w-full scroll-smooth">
         {renderView()}
       </main>
 
+      {/* NAV FIXO NA BASE */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );

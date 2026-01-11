@@ -12,8 +12,8 @@ const TipsView: React.FC<{ store: any }> = ({ store }) => {
   const [masterCodeInput, setMasterCodeInput] = useState('');
   const [adminError, setAdminError] = useState(false);
   
-  // Estados para nova senha
-  const [newLoginPassword, setNewLoginPassword] = useState(settings.accessPassword || '123456');
+  // Estados para nova senha - Fallback para 'mvp20152026#'
+  const [newLoginPassword, setNewLoginPassword] = useState(settings.accessPassword || 'mvp20152026#');
   const [showPass, setShowPass] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 

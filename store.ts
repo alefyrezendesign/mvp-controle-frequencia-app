@@ -1,108 +1,153 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { Member, AttendanceRecord, CabinetFollowUp, AppSettings, Unit, Nucleo, AttendanceStatus } from './types';
 import { MOCK_MEMBERS, UNITS, NUCLEOS, INITIAL_SETTINGS } from './constants';
 
-const LS_KEYS = {
-  MEMBERS: 'church_members',
-  ATTENDANCE: 'church_attendance',
-  CABINET: 'church_cabinet',
-  SETTINGS: 'church_settings',
-  UNITS: 'church_units',
-  NUCLEOS: 'church_nucleos',
-  LAST_UNIT: 'church_last_unit',
-  LAST_DATE: 'church_last_date'
-};
+// Estas variáveis devem ser configuradas no Vercel (Settings -> Environment Variables)
+// Fix: Access environment variables through process.env instead of import.meta.env to resolve 'env' property missing error on ImportMeta
+const SUPABASE_URL = (process.env as any).VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = (process.env as any).VITE_SUPABASE_ANON_KEY || '';
+
+// Inicializa o cliente apenas se as chaves existirem
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY 
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+  : null;
 
 export function useDataStore() {
   const [members, setMembers] = useState<Member[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [cabinet, setCabinet] = useState<CabinetFollowUp[]>([]);
   const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
-  const [units, setUnits] = useState<Unit[]>(UNITS);
-  const [nucleos, setNucleos] = useState<Nucleo[]>(NUCLEOS);
+  const [units] = useState<Unit[]>(UNITS);
+  const [nucleos] = useState<Nucleo[]>(NUCLEOS);
   const [loading, setLoading] = useState(true);
 
-  // Persistence
+  // Carregamento Inicial (Banco de Dados ou LocalStorage como backup)
   useEffect(() => {
-    const savedMembers = localStorage.getItem(LS_KEYS.MEMBERS);
-    const savedAttendance = localStorage.getItem(LS_KEYS.ATTENDANCE);
-    const savedCabinet = localStorage.getItem(LS_KEYS.CABINET);
-    const savedSettings = localStorage.getItem(LS_KEYS.SETTINGS);
-    const savedUnits = localStorage.getItem(LS_KEYS.UNITS);
-    const savedNucleos = localStorage.getItem(LS_KEYS.NUCLEOS);
+    async function loadInitialData() {
+      if (supabase) {
+        try {
+          const [
+            { data: dbMembers },
+            { data: dbAttendance },
+            { data: dbCabinet },
+            { data: dbSettings }
+          ] = await Promise.all([
+            supabase.from('members').select('*'),
+            supabase.from('attendance').select('*'),
+            supabase.from('cabinet').select('*'),
+            supabase.from('settings').select('data').single()
+          ]);
 
-    if (savedMembers) setMembers(JSON.parse(savedMembers));
-    else setMembers(MOCK_MEMBERS);
+          if (dbMembers) setMembers(dbMembers);
+          if (dbAttendance) setAttendance(dbAttendance);
+          if (dbCabinet) setCabinet(dbCabinet);
+          if (dbSettings?.data) setSettings(dbSettings.data);
+        } catch (error) {
+          console.error('Erro ao carregar do Supabase:', error);
+          loadFromLocalStorage();
+        }
+      } else {
+        loadFromLocalStorage();
+      }
+      setLoading(false);
+    }
 
-    if (savedAttendance) setAttendance(JSON.parse(savedAttendance));
-    if (savedCabinet) setCabinet(JSON.parse(savedCabinet));
-    if (savedSettings) setSettings(JSON.parse(savedSettings));
-    if (savedUnits) setUnits(JSON.parse(savedUnits));
-    if (savedNucleos) setNucleos(JSON.parse(savedNucleos));
+    function loadFromLocalStorage() {
+      const savedMembers = localStorage.getItem('church_members');
+      const savedAttendance = localStorage.getItem('church_attendance');
+      const savedSettings = localStorage.getItem('church_settings');
+      
+      if (savedMembers) setMembers(JSON.parse(savedMembers));
+      else setMembers(MOCK_MEMBERS);
+      
+      if (savedAttendance) setAttendance(JSON.parse(savedAttendance));
+      if (savedSettings) setSettings(JSON.parse(savedSettings));
+    }
 
-    setLoading(false);
+    loadInitialData();
   }, []);
 
-  useEffect(() => {
-    if (!loading) {
-      localStorage.setItem(LS_KEYS.MEMBERS, JSON.stringify(members));
-      localStorage.setItem(LS_KEYS.ATTENDANCE, JSON.stringify(attendance));
-      localStorage.setItem(LS_KEYS.CABINET, JSON.stringify(cabinet));
-      localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(settings));
-      localStorage.setItem(LS_KEYS.UNITS, JSON.stringify(units));
-      localStorage.setItem(LS_KEYS.NUCLEOS, JSON.stringify(nucleos));
-    }
-  }, [members, attendance, cabinet, settings, units, nucleos, loading]);
+  // Update Methods (Salvando no Banco)
+  const updateAttendance = async (record: Omit<AttendanceRecord, 'id' | 'registeredAt'>) => {
+    const newRecord = { 
+      ...record, 
+      id: Math.random().toString(36).substr(2, 9),
+      registeredAt: Date.now() 
+    };
 
-  const updateAttendance = (record: Omit<AttendanceRecord, 'id' | 'registeredAt'>) => {
     setAttendance(prev => {
       const filtered = prev.filter(r => !(r.memberId === record.memberId && r.date === record.date));
-      if (record.status === AttendanceStatus.NOT_REGISTERED) {
-        return filtered;
-      }
-      return [...filtered, { 
-        ...record, 
-        id: Math.random().toString(36).substr(2, 9),
-        registeredAt: Date.now() 
-      }];
+      return record.status === AttendanceStatus.NOT_REGISTERED ? filtered : [...filtered, newRecord];
     });
+
+    if (supabase) {
+      // Deleta anterior e insere novo no banco
+      await supabase.from('attendance').delete().match({ memberId: record.memberId, date: record.date });
+      if (record.status !== AttendanceStatus.NOT_REGISTERED) {
+        await supabase.from('attendance').insert(newRecord);
+      }
+    } else {
+      localStorage.setItem('church_attendance', JSON.stringify(attendance));
+    }
   };
 
-  const batchUpdateAttendance = (records: AttendanceRecord[]) => {
+  const batchUpdateAttendance = async (records: AttendanceRecord[]) => {
     setAttendance(prev => {
       const keysToRemove = new Set(records.map(r => `${r.memberId}-${r.date}`));
       const filtered = prev.filter(r => !keysToRemove.has(`${r.memberId}-${r.date}`));
       return [...filtered, ...records];
     });
+
+    if (supabase) {
+      for (const r of records) {
+        await supabase.from('attendance').upsert(r);
+      }
+    }
   };
 
-  const updateCabinetStatus = (memberId: string, period: string, status: CabinetFollowUp['status']) => {
+  const updateCabinetStatus = async (memberId: string, period: string, status: CabinetFollowUp['status']) => {
+    const newItem = { memberId, period, status, lastUpdate: Date.now() };
     setCabinet(prev => {
       const filtered = prev.filter(c => !(c.memberId === memberId && c.period === period));
-      return [...filtered, { memberId, period, status, lastUpdate: Date.now() }];
+      return [...filtered, newItem];
     });
+
+    if (supabase) {
+      await supabase.from('cabinet').upsert(newItem);
+    }
   };
 
-  const saveMember = (member: Member) => {
+  const saveMember = async (member: Member) => {
     setMembers(prev => {
       const exists = prev.find(m => m.id === member.id);
-      if (exists) return prev.map(m => m.id === member.id ? member : m);
-      return [...prev, member];
+      return exists ? prev.map(m => m.id === member.id ? member : m) : [...prev, member];
     });
+
+    if (supabase) {
+      await supabase.from('members').upsert(member);
+    }
   };
 
-  const batchSaveMembers = (newMembers: Member[]) => {
-    setMembers(prev => {
-      // Evitar duplicatas por nome (opcional, mas seguro)
-      const existingNames = new Set(prev.map(m => m.name.toLowerCase()));
-      const uniqueNew = newMembers.filter(m => !existingNames.has(m.name.toLowerCase()));
-      return [...prev, ...uniqueNew];
-    });
+  const batchSaveMembers = async (newMembers: Member[]) => {
+    setMembers(prev => [...prev, ...newMembers]);
+    if (supabase) {
+      await supabase.from('members').insert(newMembers);
+    }
+  };
+
+  const updateSettings = async (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    if (supabase) {
+      await supabase.from('settings').upsert({ id: 1, data: newSettings });
+    } else {
+      localStorage.setItem('church_settings', JSON.stringify(newSettings));
+    }
   };
 
   return {
     members, attendance, cabinet, settings, units, nucleos, loading,
-    updateAttendance, batchUpdateAttendance, updateCabinetStatus, saveMember, batchSaveMembers, setSettings
+    updateAttendance, batchUpdateAttendance, updateCabinetStatus, saveMember, batchSaveMembers, setSettings: updateSettings
   };
 }

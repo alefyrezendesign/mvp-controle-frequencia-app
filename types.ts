@@ -37,7 +37,6 @@ export interface Member {
   name: string;
   nucleoId: string;
   unitId: string;
-  phone?: string;
   active: boolean;
   notes?: string;
 }

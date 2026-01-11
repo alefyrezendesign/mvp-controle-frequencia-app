@@ -22,7 +22,7 @@ export const NUCLEOS: Nucleo[] = [
 
 export const INITIAL_SETTINGS: AppSettings = {
   justifiedCountsAsPresence: false,
-  accessPassword: '123456', // Senha padrão inicial
+  accessPassword: 'mvp20152026#', // Nova senha padrão inicial
   thresholds: {
     perfect: 100,
     good: 80,

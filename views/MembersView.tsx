@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Search, Plus, UserPlus, Edit2, Phone, FileUp, X, Download, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, UserPlus, Edit2, FileUp, X, Download, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Member, Unit, Nucleo } from '../types';
 import { getNucleoColor } from '../utils';
 
@@ -63,8 +63,8 @@ const MembersView: React.FC<MembersViewProps> = ({ store, selectedUnit }) => {
           return (
             <div key={member.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between group hover:border-zinc-700 transition-colors">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-purple-600/20 border border-purple-500/20 flex items-center justify-center text-purple-400 font-bold group-hover:scale-110 transition-transform">
-                  {member.name.charAt(0)}
+                <div className="w-10 h-10 rounded-full bg-purple-600/20 border border-purple-500/20 flex items-center justify-center text-purple-400 font-bold group-hover:scale-110 transition-transform text-xs uppercase">
+                  {member.name.substring(0,2)}
                 </div>
                 <div>
                   <p className="font-semibold text-zinc-200">{member.name}</p>
@@ -74,11 +74,6 @@ const MembersView: React.FC<MembersViewProps> = ({ store, selectedUnit }) => {
                 </div>
               </div>
               <div className="flex gap-2">
-                {member.phone && (
-                  <a href={`https://wa.me/${member.phone}`} target="_blank" className="p-2 text-zinc-500 hover:text-emerald-500 transition-colors">
-                    <Phone className="w-4 h-4" />
-                  </a>
-                )}
                 <button 
                   onClick={() => {
                     setEditingMember(member);
@@ -139,23 +134,19 @@ const BulkImportModal = ({ onClose, onImport, unitId, nucleos }: any) => {
         const lines = text.split('\n');
         const newMembers: Member[] = [];
 
-        // Ignora o cabeçalho se houver
         const startLine = lines[0].toLowerCase().includes('nome') ? 1 : 0;
 
         for (let i = startLine; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
 
-          // Suporta vírgula ou ponto e vírgula
           const cols = line.includes(';') ? line.split(';') : line.split(',');
           
           const name = cols[0]?.trim();
           const nucleoName = cols[1]?.trim();
-          const phone = cols[2]?.trim().replace(/\D/g, ''); // Limpa caracteres não numéricos
 
           if (!name) continue;
 
-          // Tenta encontrar o núcleo pelo nome
           const matchedNucleo = nucleos.find((n: Nucleo) => 
             n.name.toLowerCase() === nucleoName?.toLowerCase()
           );
@@ -165,7 +156,6 @@ const BulkImportModal = ({ onClose, onImport, unitId, nucleos }: any) => {
             name,
             nucleoId: matchedNucleo?.id || nucleos[0]?.id || 'n6',
             unitId,
-            phone: phone || undefined,
             active: true
           });
         }
@@ -184,7 +174,7 @@ const BulkImportModal = ({ onClose, onImport, unitId, nucleos }: any) => {
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = "Nome,Núcleo,Telefone\nFulano de Tal,Membro,5511999999999\nBeltrana,Kids,5511888888888";
+    const csvContent = "Nome,Núcleo\nFulano de Tal,Membro\nBeltrana,Kids";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -207,7 +197,6 @@ const BulkImportModal = ({ onClose, onImport, unitId, nucleos }: any) => {
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-6">
-          {/* Instruções */}
           <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-3xl space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-xl bg-purple-600/10 border border-purple-500/20 flex items-center justify-center shrink-0">
@@ -216,8 +205,8 @@ const BulkImportModal = ({ onClose, onImport, unitId, nucleos }: any) => {
               <div>
                 <p className="text-xs font-bold text-zinc-200">Instruções de Formatação</p>
                 <p className="text-[11px] text-zinc-500 leading-relaxed mt-1">
-                  Seu arquivo CSV deve conter 3 colunas na ordem exata: <br/>
-                  <span className="text-zinc-300 font-bold">Nome, Núcleo, Telefone</span>
+                  Seu arquivo CSV deve conter 2 colunas na ordem exata: <br/>
+                  <span className="text-zinc-300 font-bold">Nome, Núcleo</span>
                 </p>
               </div>
             </div>
@@ -229,7 +218,6 @@ const BulkImportModal = ({ onClose, onImport, unitId, nucleos }: any) => {
             </button>
           </div>
 
-          {/* Upload Zone */}
           {preview.length === 0 ? (
             <div 
               onClick={() => fileInputRef.current?.click()}
@@ -260,12 +248,11 @@ const BulkImportModal = ({ onClose, onImport, unitId, nucleos }: any) => {
                 {preview.map((m, idx) => (
                   <div key={idx} className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-3 flex items-center justify-between">
                     <div className="flex flex-col">
-                      <span className="text-xs font-bold text-zinc-200 truncate max-w-[150px]">{m.name}</span>
+                      <span className="text-xs font-bold text-zinc-200 truncate max-w-[200px]">{m.name}</span>
                       <span className="text-[9px] text-zinc-600 font-bold uppercase">
                         {nucleos.find((n: Nucleo) => n.id === m.nucleoId)?.name}
                       </span>
                     </div>
-                    {m.phone && <span className="text-[9px] text-zinc-500 font-mono">{m.phone}</span>}
                   </div>
                 ))}
               </div>
@@ -308,7 +295,6 @@ const MemberFormModal = ({ onClose, saveMember, initialData, unitId, nucleos }: 
     name: '',
     nucleoId: nucleos[0]?.id || '',
     unitId: unitId,
-    phone: '',
     active: true
   });
 
@@ -336,27 +322,18 @@ const MemberFormModal = ({ onClose, saveMember, initialData, unitId, nucleos }: 
               onChange={e => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Núcleo</label>
-              <select 
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-sm text-white outline-none focus:border-purple-600 appearance-none"
-                value={formData.nucleoId}
-                onChange={e => setFormData({ ...formData, nucleoId: e.target.value })}
-              >
-                {nucleos.map((n: any) => <option key={n.id} value={n.id}>{n.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Telefone (WhatsApp)</label>
-              <input 
-                placeholder="Ex: 55119..."
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-sm text-white focus:border-purple-600 outline-none transition-all"
-                value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-              />
-            </div>
+          
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Núcleo</label>
+            <select 
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-sm text-white outline-none focus:border-purple-600 appearance-none"
+              value={formData.nucleoId}
+              onChange={e => setFormData({ ...formData, nucleoId: e.target.value })}
+            >
+              {nucleos.map((n: any) => <option key={n.id} value={n.id}>{n.name}</option>)}
+            </select>
           </div>
+
           <div className="flex items-center gap-3 p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
             <input 
               type="checkbox" 
@@ -367,6 +344,7 @@ const MemberFormModal = ({ onClose, saveMember, initialData, unitId, nucleos }: 
             />
             <label htmlFor="active-member" className="text-xs font-bold text-zinc-400 cursor-pointer">Membro Ativo e Visível</label>
           </div>
+          
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">Cancelar</button>
             <button type="submit" className="flex-[2] bg-purple-600 py-4 rounded-2xl text-xs font-black text-white uppercase tracking-widest shadow-lg shadow-purple-600/20 active:scale-[0.98] transition-all">
